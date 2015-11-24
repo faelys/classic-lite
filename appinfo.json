@@ -1,0 +1,15 @@
+{
+  "uuid": "5a03163f-924b-468d-9f2b-bfdd7310a7bf",
+  "shortName": "Classic Lite",
+  "longName": "Classic Lite",
+  "companyName": "Natasha Kerensikova",
+  "versionLabel": "1.0",
+  "sdkVersion": "3",
+  "targetPlatforms": ["aplite", "basalt", "chalk"],
+  "watchapp": {
+    "watchface": true
+  },
+  "resources": {
+    "media": []
+  }
+}
