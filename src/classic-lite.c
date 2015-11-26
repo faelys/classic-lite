@@ -23,6 +23,9 @@
 
 static GColor background_color;
 static GColor hand_color;
+static GColor hour_mark_color;
+static GColor inner_rectangle_color;
+static GColor minute_mark_color;
 
 /*****************
  * HELPER MACROS *
@@ -36,6 +39,19 @@ static GColor hand_color;
 		{ 0, (down) }, \
 		{ (right), 0 } } }
 
+#ifdef PBL_SDK_3
+#define INSET_RECT(output, input, amount) do { \
+	(output) = grect_inset((input), GEdgeInsets((amount))); \
+	} while(0)
+#else
+#define INSET_RECT(output, input, amount) do { \
+	(output).origin.x = (input).origin.x + (amount); \
+	(output).origin.y = (input).origin.y + (amount); \
+	(output).size.w = (input).size.w - 2 * (amount); \
+	(output).size.h = (input).size.h - 2 * (amount); \
+	} while(0)
+#endif
+
 /**********************
  * DISPLAY PRIMITIVES *
  **********************/
@@ -47,10 +63,103 @@ static const GPathInfo hour_hand_path_points
 
 static struct tm tm_now;
 static Window *window;
+static Layer *background_layer;
 static Layer *hand_layer;
 static GPath *hour_hand_path;
 static GPath *minute_hand_path;
 static GPoint center;
+
+static void
+point_at_angle(GRect *rect, int32_t angle, GPoint *output, int *horizontal) {
+	int32_t sin_value = sin_lookup(angle);
+	int32_t cos_value = cos_lookup(angle);
+	int32_t abs_sin = abs(sin_value);
+	int32_t abs_cos = abs(cos_value);
+	int32_t width = rect->size.w - 1;
+	int32_t height = rect->size.h - 1;
+
+	*horizontal = (height * abs_sin < width * abs_cos);
+
+	if (*horizontal) {
+		output->x = (height * sin_value / abs_cos + width) / 2;
+		output->y = (cos_value > 0) ? 0 : height;
+	}
+	else {
+		output->x = (sin_value > 0) ? width : 0;
+		output->y = (height - width * cos_value / abs_sin) / 2;
+	}
+	output->x += rect->origin.x;
+	output->y += rect->origin.y;
+}
+
+
+static void background_layer_draw(Layer *layer, GContext *ctx) {
+	int horiz, i;
+	GRect bounds = layer_get_bounds(layer);
+	GRect rect, rect2;
+	GPoint pt1, pt2;
+
+	(void)layer;
+
+	graphics_context_set_stroke_color(ctx, minute_mark_color);
+	INSET_RECT(rect, bounds, 5);
+	for (i = 0; i < 60; i += 1) {
+		point_at_angle(&rect, TRIG_MAX_ANGLE * i / 60, &pt1, &horiz);
+		pt2.x = pt1.x + horiz;
+		pt2.y = pt1.y + (1 - horiz);
+		graphics_draw_line(ctx, pt1, pt2);
+	}
+
+#ifndef PBL_BW
+	graphics_context_set_stroke_width(ctx, 3);
+#endif
+
+	graphics_context_set_stroke_color(ctx, hour_mark_color);
+	INSET_RECT(rect,  bounds, 11);
+	INSET_RECT(rect2, bounds, 22);
+	for (i = 0; i < 12; i += 1) {
+		point_at_angle(&rect, TRIG_MAX_ANGLE * i / 12, &pt1, &horiz);
+		point_at_angle(&rect2, TRIG_MAX_ANGLE * i / 12, &pt2, &horiz);
+
+		graphics_draw_line(ctx, pt1, pt2);
+
+#ifdef PBL_BW
+		pt1.x += horiz;        pt2.x += horiz;
+		pt1.y += 1 - horiz;    pt2.y += 1 - horiz;
+		graphics_draw_line(ctx, pt1, pt2);
+
+		pt1.x -= 2 * horiz;        pt2.x -= 2 * horiz;
+		pt1.y -= 2 * (1 - horiz);  pt2.y -= 2 * (1 - horiz);
+		graphics_draw_line(ctx, pt1, pt2);
+#endif
+	}
+
+#ifndef PBL_BW
+	graphics_context_set_stroke_width(ctx, 1);
+#endif
+
+	INSET_RECT(rect, bounds, 35);
+	graphics_context_set_stroke_color(ctx, inner_rectangle_color);
+#ifdef PBL_BW
+	pt1.y = rect.origin.y;
+	pt2.y = rect.origin.y + rect.size.h - 1;
+	for (i = rect.origin.x +2; i < rect.origin.x + rect.size.w; i += 3) {
+		pt1.x = pt2.x = i;
+		graphics_draw_pixel(ctx, pt1);
+		graphics_draw_pixel(ctx, pt2);
+	}
+
+	pt1.x = rect.origin.x;
+	pt2.x = rect.origin.x + rect.size.w - 1;
+	for (i = rect.origin.y +2; i < rect.origin.y + rect.size.h; i += 3) {
+		pt1.y = pt2.y = i;
+		graphics_draw_pixel(ctx, pt1);
+		graphics_draw_pixel(ctx, pt2);
+	}
+#else
+	graphics_draw_rect(ctx, rect);
+#endif
+}
 
 static void
 hand_layer_draw(Layer *layer, GContext *ctx) {
@@ -98,6 +207,10 @@ window_load(Window *window) {
 	gpath_move_to(hour_hand_path, center);
 	gpath_move_to(minute_hand_path, center);
 
+	background_layer = layer_create(bounds);
+	layer_set_update_proc(background_layer, &background_layer_draw);
+	layer_add_child(window_layer, background_layer);
+
 	hand_layer = layer_create(bounds);
 	layer_set_update_proc(hand_layer, &hand_layer_draw);
 	layer_add_child(window_layer, hand_layer);
@@ -105,6 +218,7 @@ window_load(Window *window) {
 
 static void
 window_unload(Window *window) {
+	layer_destroy(background_layer);
 	layer_destroy(hand_layer);
 }
 
@@ -121,6 +235,14 @@ init(void) {
 
 	background_color = GColorWhite;
 	hand_color = GColorBlack;
+	hour_mark_color = GColorBlack;
+	minute_mark_color = GColorBlack;
+
+#ifdef PBL_BW
+	inner_rectangle_color = GColorBlack;
+#else
+	inner_rectangle_color = GColorLightGray;
+#endif
 
 	hour_hand_path = gpath_create(&hour_hand_path_points);
 	minute_hand_path = gpath_create(&minute_hand_path_points);
