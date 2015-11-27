@@ -69,6 +69,7 @@ static GPath *hour_hand_path;
 static GPath *minute_hand_path;
 static GPoint center;
 
+#ifdef PBL_RECT
 static void
 point_at_angle(GRect *rect, int32_t angle, GPoint *output, int *horizontal) {
 	int32_t sin_value = sin_lookup(angle);
@@ -160,6 +161,46 @@ static void background_layer_draw(Layer *layer, GContext *ctx) {
 	graphics_draw_rect(ctx, rect);
 #endif
 }
+#else
+static void
+background_layer_draw(Layer *layer, GContext *ctx) {
+	const GRect bounds = layer_get_bounds(layer);
+	const GPoint center = grect_center_point(&bounds);
+	const int32_t radius = (bounds.size.w + bounds.size.h) / 4;
+	const int32_t angle_delta = TRIG_MAX_ANGLE / (6 * radius);
+	int32_t angle, x, y;
+	GRect rect;
+	GPoint pt1, pt2;
+	int i;
+
+	(void)layer;
+
+	graphics_context_set_stroke_color(ctx, minute_mark_color);
+	INSET_RECT(rect, bounds, 5);
+	for (i = 0; i < 60; i += 1) {
+		angle = TRIG_MAX_ANGLE * i / 60;
+		graphics_draw_arc(ctx, rect, GOvalScaleModeFillCircle,
+		    angle - angle_delta, angle + angle_delta);
+	}
+
+	graphics_context_set_stroke_width(ctx, 3);
+	graphics_context_set_stroke_color(ctx, hour_mark_color);
+	for (i = 0; i < 12; i += 1) {
+		angle = TRIG_MAX_ANGLE * i / 12;
+		x = sin_lookup(angle);
+		y = -cos_lookup(angle);
+		pt1.x = center.x + (radius - 11) * x / TRIG_MAX_RATIO;
+		pt1.y = center.y + (radius - 11) * y / TRIG_MAX_RATIO;
+		pt2.x = center.x + (radius - 22) * x / TRIG_MAX_RATIO;
+		pt2.y = center.y + (radius - 22) * y / TRIG_MAX_RATIO;
+		graphics_draw_line(ctx, pt1, pt2);
+	}
+
+	graphics_context_set_stroke_width(ctx, 1);
+	graphics_context_set_stroke_color(ctx, inner_rectangle_color);
+	graphics_draw_circle(ctx, center, radius - 35);
+}
+#endif
 
 static void
 hand_layer_draw(Layer *layer, GContext *ctx) {
