@@ -26,6 +26,9 @@ static GColor hand_color;
 static GColor hour_mark_color;
 static GColor inner_rectangle_color;
 static GColor minute_mark_color;
+static GColor text_color;
+const char *text_font = FONT_KEY_GOTHIC_14;
+const char text_format[] = "%a %d";
 
 /*****************
  * HELPER MACROS *
@@ -65,9 +68,11 @@ static struct tm tm_now;
 static Window *window;
 static Layer *background_layer;
 static Layer *hand_layer;
+static TextLayer *text_layer;
 static GPath *hour_hand_path;
 static GPath *minute_hand_path;
 static GPoint center;
+static char text_buffer[64];
 
 #ifdef PBL_RECT
 static void
@@ -224,12 +229,19 @@ hand_layer_draw(Layer *layer, GContext *ctx) {
 	graphics_fill_circle(ctx, center, 1);
 }
 
+static void
+update_text_layer(struct tm *time) {
+	strftime(text_buffer, sizeof text_buffer, text_format, time);
+	text_layer_set_text(text_layer, text_buffer);
+}
+
 /********************
  * SERVICE HANDLERS *
  ********************/
 
 static void
 tick_handler(struct tm* tick_time, TimeUnits units_changed) {
+	if (tm_now.tm_mday != tick_time->tm_mday) update_text_layer(tick_time);
 	tm_now = *tick_time;
 	layer_mark_dirty(hand_layer);
 }
@@ -251,6 +263,17 @@ window_load(Window *window) {
 	background_layer = layer_create(bounds);
 	layer_set_update_proc(background_layer, &background_layer_draw);
 	layer_add_child(window_layer, background_layer);
+
+	text_layer = text_layer_create(GRect(
+	    bounds.origin.x + (bounds.size.w - 72) / 2,
+	    bounds.origin.y + 36 + PBL_IF_RECT_ELSE(5, 15),
+	    72, 23));
+	text_layer_set_text_color(text_layer, text_color);
+	text_layer_set_background_color(text_layer, background_color);
+	text_layer_set_text_alignment(text_layer, GTextAlignmentCenter);
+	text_layer_set_font(text_layer, fonts_get_system_font(text_font));
+	layer_add_child(window_layer, text_layer_get_layer(text_layer));
+	update_text_layer(&tm_now);
 
 	hand_layer = layer_create(bounds);
 	layer_set_update_proc(hand_layer, &hand_layer_draw);
@@ -278,6 +301,7 @@ init(void) {
 	hand_color = GColorBlack;
 	hour_mark_color = GColorBlack;
 	minute_mark_color = GColorBlack;
+	text_color = GColorBlack;
 
 #ifdef PBL_BW
 	inner_rectangle_color = GColorBlack;
