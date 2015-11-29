@@ -22,13 +22,15 @@
  **********************/
 
 static GColor background_color;
+static GColor bluetooth_color;
 static GColor hand_color;
 static GColor hour_mark_color;
 static GColor inner_rectangle_color;
 static GColor minute_mark_color;
 static GColor text_color;
-const char *text_font = FONT_KEY_GOTHIC_14;
-const char text_format[] = "%a %d";
+static const char *text_font = FONT_KEY_GOTHIC_14;
+static const char text_format[] = "%a %d";
+static bool bluetooth_vibration = true;
 
 /*****************
  * HELPER MACROS *
@@ -63,12 +65,28 @@ static const GPathInfo minute_hand_path_points
 	= QUAD_PATH_POINTS(15, 6, -72, -6);
 static const GPathInfo hour_hand_path_points
 	= QUAD_PATH_POINTS(15, 7, -50, -7);
+static const GPathInfo bluetooth_logo_points = { 7, (GPoint[]) {
+	{ -4, -4 },
+	{  4,  4 },
+	{  0,  8 },
+	{  0, -8 },
+	{  4, -4 },
+	{ -4,  4 },
+	{  0,  0 } } };
+static const GPathInfo bluetooth_frame_points = { 3, (GPoint[]) {
+	{ -15,  11 },
+	{   0, -15 },
+	{  15,  11 } } };
 
 static struct tm tm_now;
+static bool bluetooth_connected = 0;
 static Window *window;
 static Layer *background_layer;
 static Layer *hand_layer;
+static Layer *icon_layer;
 static TextLayer *text_layer;
+static GPath *bluetooth_frame;
+static GPath *bluetooth_logo;
 static GPath *hour_hand_path;
 static GPath *minute_hand_path;
 static GPoint center;
@@ -230,6 +248,21 @@ hand_layer_draw(Layer *layer, GContext *ctx) {
 }
 
 static void
+icon_layer_draw(Layer *layer, GContext *ctx) {
+	GRect bounds = layer_get_bounds(layer);
+	GPoint center = grect_center_point(&bounds);
+	gpath_move_to(bluetooth_frame, center);
+	gpath_move_to(bluetooth_logo, center);
+	graphics_context_set_stroke_color(ctx, bluetooth_color);
+	gpath_draw_outline(ctx, bluetooth_frame);
+#ifdef PBL_SDK_3
+	gpath_draw_outline_open(ctx, bluetooth_logo);
+#else
+	gpath_draw_outline(ctx, bluetooth_logo);
+#endif
+}
+
+static void
 update_text_layer(struct tm *time) {
 	strftime(text_buffer, sizeof text_buffer, text_format, time);
 	text_layer_set_text(text_layer, text_buffer);
@@ -238,6 +271,15 @@ update_text_layer(struct tm *time) {
 /********************
  * SERVICE HANDLERS *
  ********************/
+
+static void
+bluetooth_handler(bool connected) {
+	bluetooth_connected = connected;
+	layer_set_hidden(icon_layer, connected);
+	layer_mark_dirty(icon_layer);
+
+	if (bluetooth_vibration && !connected) vibes_long_pulse();
+}
 
 static void
 tick_handler(struct tm* tick_time, TimeUnits units_changed) {
@@ -275,6 +317,12 @@ window_load(Window *window) {
 	layer_add_child(window_layer, text_layer_get_layer(text_layer));
 	update_text_layer(&tm_now);
 
+	icon_layer = layer_create(GRect(bounds.origin.x
+	    + (bounds.size.w - 31) / 2, PBL_IF_RECT_ELSE(100, 110), 31, 31));
+	layer_set_update_proc(icon_layer, &icon_layer_draw);
+	layer_set_hidden(icon_layer, bluetooth_connected);
+	layer_add_child(window_layer, icon_layer);
+
 	hand_layer = layer_create(bounds);
 	layer_set_update_proc(hand_layer, &hand_layer_draw);
 	layer_add_child(window_layer, hand_layer);
@@ -284,12 +332,16 @@ static void
 window_unload(Window *window) {
 	layer_destroy(background_layer);
 	layer_destroy(hand_layer);
+	layer_destroy(icon_layer);
+	text_layer_destroy(text_layer);
 }
 
 static void
 init(void) {
 	time_t current_time = time(0);
 	tm_now = *localtime(&current_time);
+
+	bluetooth_connected = connection_service_peek_pebble_app_connection();
 
 	window = window_create();
 	window_set_window_handlers(window, (WindowHandlers) {
@@ -298,6 +350,7 @@ init(void) {
 	});
 
 	background_color = GColorWhite;
+	bluetooth_color = GColorBlack;
 	hand_color = GColorBlack;
 	hour_mark_color = GColorBlack;
 	minute_mark_color = GColorBlack;
@@ -309,16 +362,24 @@ init(void) {
 	inner_rectangle_color = GColorLightGray;
 #endif
 
+	bluetooth_frame = gpath_create(&bluetooth_frame_points);
+	bluetooth_logo = gpath_create(&bluetooth_logo_points);
 	hour_hand_path = gpath_create(&hour_hand_path_points);
 	minute_hand_path = gpath_create(&minute_hand_path_points);
 
+	connection_service_subscribe(((ConnectionHandlers){
+	    .pebble_app_connection_handler = &bluetooth_handler,
+	    .pebblekit_connection_handler = 0}));
 	tick_timer_service_subscribe(MINUTE_UNIT, &tick_handler);
 	window_stack_push(window, true);
 }
 
 static void
 deinit(void) {
+	connection_service_unsubscribe();
 	tick_timer_service_unsubscribe();
+	gpath_destroy(bluetooth_frame);
+	gpath_destroy(bluetooth_logo);
 	gpath_destroy(hour_hand_path);
 	gpath_destroy(minute_hand_path);
 	window_destroy(window);
