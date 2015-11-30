@@ -22,6 +22,7 @@
  **********************/
 
 static GColor background_color;
+static GColor battery_color;
 static GColor bluetooth_color;
 static GColor hand_color;
 static GColor hour_mark_color;
@@ -31,6 +32,7 @@ static GColor text_color;
 static const char *text_font = FONT_KEY_GOTHIC_14;
 static const char text_format[] = "%a %d";
 static bool bluetooth_vibration = true;
+static uint8_t show_battery_icon_below = 100;
 
 /*****************
  * HELPER MACROS *
@@ -66,17 +68,17 @@ static const GPathInfo minute_hand_path_points
 static const GPathInfo hour_hand_path_points
 	= QUAD_PATH_POINTS(15, 7, -50, -7);
 static const GPathInfo bluetooth_logo_points = { 7, (GPoint[]) {
-	{ -4, -4 },
-	{  4,  4 },
-	{  0,  8 },
-	{  0, -8 },
-	{  4, -4 },
-	{ -4,  4 },
+	{ -3, -3 },
+	{  3,  3 },
+	{  0,  6 },
+	{  0, -6 },
+	{  3, -3 },
+	{ -3,  3 },
 	{  0,  0 } } };
 static const GPathInfo bluetooth_frame_points = { 3, (GPoint[]) {
-	{ -15,  11 },
-	{   0, -15 },
-	{  15,  11 } } };
+	{ -13,   9 },
+	{   0, -14 },
+	{  13,   9 } } };
 
 static struct tm tm_now;
 static bool bluetooth_connected = 0;
@@ -91,6 +93,8 @@ static GPath *hour_hand_path;
 static GPath *minute_hand_path;
 static GPoint center;
 static char text_buffer[64];
+static uint8_t current_battery = 100;
+#define has_battery (current_battery > show_battery_icon_below)
 
 #ifdef PBL_RECT
 static void
@@ -116,8 +120,8 @@ point_at_angle(GRect *rect, int32_t angle, GPoint *output, int *horizontal) {
 	output->y += rect->origin.y;
 }
 
-
-static void background_layer_draw(Layer *layer, GContext *ctx) {
+static void
+background_layer_draw(Layer *layer, GContext *ctx) {
 	int horiz, i;
 	GRect bounds = layer_get_bounds(layer);
 	GRect rect, rect2;
@@ -251,15 +255,40 @@ static void
 icon_layer_draw(Layer *layer, GContext *ctx) {
 	GRect bounds = layer_get_bounds(layer);
 	GPoint center = grect_center_point(&bounds);
-	gpath_move_to(bluetooth_frame, center);
-	gpath_move_to(bluetooth_logo, center);
-	graphics_context_set_stroke_color(ctx, bluetooth_color);
-	gpath_draw_outline(ctx, bluetooth_frame);
+	GPoint pt;
+
+	if (!bluetooth_connected) {
+		pt.x = center.x;
+		pt.y = center.y + (has_battery ? +1 : -2);
+		gpath_move_to(bluetooth_frame, pt);
+		gpath_move_to(bluetooth_logo, pt);
+		graphics_context_set_stroke_color(ctx, bluetooth_color);
+		gpath_draw_outline(ctx, bluetooth_frame);
 #ifdef PBL_SDK_3
-	gpath_draw_outline_open(ctx, bluetooth_logo);
+		gpath_draw_outline_open(ctx, bluetooth_logo);
 #else
-	gpath_draw_outline(ctx, bluetooth_logo);
+		gpath_draw_outline(ctx, bluetooth_logo);
 #endif
+	}
+
+	if (!has_battery) {
+		pt.x = center.x - 11;
+		pt.y = center.y
+		    + (bluetooth_connected ? 0 : PBL_IF_RECT_ELSE(9, 11));
+		graphics_context_set_fill_color(ctx, battery_color);
+		graphics_fill_rect(ctx,
+		    GRect(pt.x, pt.y, 22, 7),
+		    0, GCornerNone);
+		graphics_fill_rect(ctx,
+		    GRect(pt.x + 22, pt.y + 2, 2, 3),
+		    0, GCornerNone);
+		graphics_context_set_fill_color(ctx, background_color);
+		if (current_battery >= 5)
+			graphics_fill_rect(ctx,
+			    GRect(pt.x + 1 + current_battery / 5, pt.y + 1,
+			    20 - current_battery / 5, 5),
+			    0, GCornerNone);
+	}
 }
 
 static void
@@ -273,9 +302,17 @@ update_text_layer(struct tm *time) {
  ********************/
 
 static void
+battery_handler(BatteryChargeState charge) {
+	if (current_battery == charge.charge_percent) return;
+	current_battery = charge.charge_percent;
+	layer_set_hidden(icon_layer, bluetooth_connected && has_battery);
+	if (!has_battery) layer_mark_dirty(icon_layer);
+}
+
+static void
 bluetooth_handler(bool connected) {
 	bluetooth_connected = connected;
-	layer_set_hidden(icon_layer, connected);
+	layer_set_hidden(icon_layer, connected && has_battery);
 	layer_mark_dirty(icon_layer);
 
 	if (bluetooth_vibration && !connected) vibes_long_pulse();
@@ -318,9 +355,9 @@ window_load(Window *window) {
 	update_text_layer(&tm_now);
 
 	icon_layer = layer_create(GRect(bounds.origin.x
-	    + (bounds.size.w - 31) / 2, PBL_IF_RECT_ELSE(100, 110), 31, 31));
+	    + (bounds.size.w - 33) / 2, PBL_IF_RECT_ELSE(97, 105), 33, 36));
 	layer_set_update_proc(icon_layer, &icon_layer_draw);
-	layer_set_hidden(icon_layer, bluetooth_connected);
+	layer_set_hidden(icon_layer, bluetooth_connected && has_battery);
 	layer_add_child(window_layer, icon_layer);
 
 	hand_layer = layer_create(bounds);
@@ -342,6 +379,7 @@ init(void) {
 	tm_now = *localtime(&current_time);
 
 	bluetooth_connected = connection_service_peek_pebble_app_connection();
+	current_battery = battery_state_service_peek().charge_percent;
 
 	window = window_create();
 	window_set_window_handlers(window, (WindowHandlers) {
@@ -357,8 +395,10 @@ init(void) {
 	text_color = GColorBlack;
 
 #ifdef PBL_BW
+	battery_color = GColorBlack;
 	inner_rectangle_color = GColorBlack;
 #else
+	battery_color = GColorDarkGray;
 	inner_rectangle_color = GColorLightGray;
 #endif
 
@@ -367,6 +407,7 @@ init(void) {
 	hour_hand_path = gpath_create(&hour_hand_path_points);
 	minute_hand_path = gpath_create(&minute_hand_path_points);
 
+	battery_state_service_subscribe(&battery_handler);
 	connection_service_subscribe(((ConnectionHandlers){
 	    .pebble_app_connection_handler = &bluetooth_handler,
 	    .pebblekit_connection_handler = 0}));
@@ -376,6 +417,7 @@ init(void) {
 
 static void
 deinit(void) {
+	battery_state_service_unsubscribe();
 	connection_service_unsubscribe();
 	tick_timer_service_unsubscribe();
 	gpath_destroy(bluetooth_frame);
