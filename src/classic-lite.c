@@ -30,9 +30,71 @@ static GColor inner_rectangle_color;
 static GColor minute_mark_color;
 static GColor text_color;
 static const char *text_font = FONT_KEY_GOTHIC_14;
-static const char text_format[] = "%a %d";
+static char text_format[32] = "%a %d";
 static bool bluetooth_vibration = true;
 static uint8_t show_battery_icon_below = 100;
+
+static GColor
+color_from_tuple(Tuple *tuple) {
+	uint32_t value = 0;
+
+	if (!tuple) return GColorClear;
+
+	switch (tuple->type) {
+	    case TUPLE_UINT:
+		switch (tuple->length) {
+		    case 1:
+			value = tuple->value->uint8;
+			break;
+		    case 2:
+			value = tuple->value->uint16;
+			break;
+		    case 4:
+			value = tuple->value->uint32;
+			break;
+		    default:
+			APP_LOG(APP_LOG_LEVEL_ERROR,
+			    "bad uint length %u in color",
+			    (unsigned)tuple->length);
+			return GColorClear;
+		}
+		break;
+
+	    case TUPLE_INT:
+		switch (tuple->length) {
+		    case 1:
+			if (tuple->value->int8 >= 0)
+				value = tuple->value->int8;
+			break;
+		    case 2:
+			if (tuple->value->int16 >= 0)
+				value = tuple->value->int16;
+			break;
+		    case 4:
+			if (tuple->value->int32 >= 0)
+				value = tuple->value->int32;
+			break;
+		    default:
+			APP_LOG(APP_LOG_LEVEL_ERROR,
+			    "bad int length %u in color",
+			    (unsigned)tuple->length);
+			return GColorClear;
+		}
+		break;
+
+	    default:
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "bad type %d for color",
+		    (int)tuple->type);
+		return GColorClear;
+	}
+
+#ifdef PBL_SDK_3
+	return GColorFromHEX(value);
+#elif PBL_SDK_2
+	return (value & 0x808080) ? GColorWhite : GColorBlack;
+#endif
+}
 
 /*****************
  * HELPER MACROS *
@@ -319,6 +381,91 @@ bluetooth_handler(bool connected) {
 }
 
 static void
+inbox_received_handler(DictionaryIterator *iterator, void *context) {
+	Tuple *tuple;
+
+	(void)context;
+
+	for (tuple = dict_read_first(iterator);
+	    tuple;
+	    tuple = dict_read_next(iterator)) {
+		switch (tuple->key) {
+		    case 1:
+			background_color = color_from_tuple(tuple);
+			window_set_background_color(window, background_color);
+			text_layer_set_background_color(text_layer,
+			    background_color);
+			break;
+		    case 2:
+			battery_color = color_from_tuple(tuple);
+			layer_mark_dirty(icon_layer);
+			break;
+		    case 3:
+			bluetooth_color = color_from_tuple(tuple);
+			layer_mark_dirty(icon_layer);
+			break;
+		    case 4:
+			hand_color = color_from_tuple(tuple);
+			layer_mark_dirty(hand_layer);
+			break;
+		    case 5:
+			hour_mark_color = color_from_tuple(tuple);
+			layer_mark_dirty(background_layer);
+			break;
+		    case 6:
+			inner_rectangle_color = color_from_tuple(tuple);
+			layer_mark_dirty(background_layer);
+			break;
+		    case 7:
+			minute_mark_color = color_from_tuple(tuple);
+			layer_mark_dirty(background_layer);
+			break;
+		    case 8:
+			text_color = color_from_tuple(tuple);
+			text_layer_set_text_color(text_layer, text_color);
+			break;
+		/*  case 9: is reserved for a future color */
+		/*  case 10: TODO: text_font */
+		    case 11:
+			if (tuple->type == TUPLE_CSTRING)
+				strncpy(text_format, tuple->value->cstring,
+				   sizeof text_format);
+			else
+				APP_LOG(APP_LOG_LEVEL_ERROR,
+				    "bad type %d for text_format entry",
+				    (int)tuple->type);
+			break;
+		    case 12:
+			if (tuple->type == TUPLE_INT
+			    || tuple->type == TUPLE_UINT)
+				bluetooth_vibration
+				    = tuple->value->data[0] != 0;
+			else
+				APP_LOG(APP_LOG_LEVEL_ERROR,
+				    "bad type %d for bluetooth_vibration entry",
+				    (int)tuple->type);
+			break;
+		    case 13:
+			if (tuple->type == TUPLE_INT)
+				show_battery_icon_below
+				    = (tuple->value->int8 < 0) ? 0
+				    : tuple->value->int8;
+			else if (tuple->type == TUPLE_UINT)
+				show_battery_icon_below = tuple->value->uint8;
+			else
+				APP_LOG(APP_LOG_LEVEL_ERROR, "bad type %d for "
+				    "show_battery_icon_below entry",
+				    (int)tuple->type);
+			break;
+		    default:
+			APP_LOG(APP_LOG_LEVEL_ERROR,
+			    "unknown configuration key %lu",
+			    (unsigned long)tuple->key);
+		}
+	}
+}
+
+static void
 tick_handler(struct tm* tick_time, TimeUnits units_changed) {
 	if (tm_now.tm_mday != tick_time->tm_mday) update_text_layer(tick_time);
 	tm_now = *tick_time;
@@ -413,6 +560,9 @@ init(void) {
 	    .pebblekit_connection_handler = 0}));
 	tick_timer_service_subscribe(MINUTE_UNIT, &tick_handler);
 	window_stack_push(window, true);
+
+	app_message_register_inbox_received(inbox_received_handler);
+	app_message_open(app_message_inbox_size_maximum(), 0);
 }
 
 static void
