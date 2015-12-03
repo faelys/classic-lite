@@ -427,10 +427,11 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 		/*  case 9: is reserved for a future color */
 		/*  case 10: TODO: text_font */
 		    case 11:
-			if (tuple->type == TUPLE_CSTRING)
+			if (tuple->type == TUPLE_CSTRING) {
 				strncpy(text_format, tuple->value->cstring,
 				   sizeof text_format);
-			else
+				update_text_layer(&tm_now);
+			} else
 				APP_LOG(APP_LOG_LEVEL_ERROR,
 				    "bad type %d for text_format entry",
 				    (int)tuple->type);
@@ -456,6 +457,8 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 				APP_LOG(APP_LOG_LEVEL_ERROR, "bad type %d for "
 				    "show_battery_icon_below entry",
 				    (int)tuple->type);
+			layer_set_hidden(icon_layer,
+			    bluetooth_connected && has_battery);
 			break;
 		    default:
 			APP_LOG(APP_LOG_LEVEL_ERROR,
