@@ -33,6 +33,79 @@ static const char *text_font = FONT_KEY_GOTHIC_14;
 static char text_format[32] = "%a %d";
 static bool bluetooth_vibration = true;
 static uint8_t show_battery_icon_below = 100;
+#define PERSIST_BUFFER_SIZE 43
+
+#ifdef PBL_SDK_3
+#define READ_COLOR(color, byte) do { (color).argb = (byte); } while (0)
+#define SAVE_COLOR(byte, color) do { (byte) = (color).argb; } while (0)
+#elif PBL_SDK_2
+#define READ_COLOR(color, byte) do { (color) = (byte); } while (0)
+#define SAVE_COLOR(byte, color) do { (byte) = (color); } while (0)
+#endif
+
+static void
+read_config(void) {
+	uint8_t buffer[PERSIST_BUFFER_SIZE + 1];
+	int i;
+
+	i = persist_read_data(1, buffer, sizeof buffer);
+
+	if (i == E_DOES_NOT_EXIST) return;
+
+	if (i != PERSIST_BUFFER_SIZE) {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "unexpected persist buffer size %d", i);
+		return;
+	}
+
+	if (buffer[0] != 1) {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "unknown configuration version %u", (unsigned)(buffer[0]));
+		return;
+	}
+
+	READ_COLOR(background_color,      buffer[1]);
+	READ_COLOR(battery_color,         buffer[2]);
+	READ_COLOR(bluetooth_color,       buffer[3]);
+	READ_COLOR(hand_color,            buffer[4]);
+	READ_COLOR(hour_mark_color,       buffer[5]);
+	READ_COLOR(inner_rectangle_color, buffer[6]);
+	READ_COLOR(minute_mark_color,     buffer[7]);
+	READ_COLOR(text_color,            buffer[8]);
+
+	bluetooth_vibration = (buffer[9] != 0);
+	show_battery_icon_below = buffer[10];
+
+	memcpy(text_format, buffer + 11, sizeof text_format);
+}
+
+static void
+write_config(void) {
+	uint8_t buffer[PERSIST_BUFFER_SIZE];
+	int i;
+
+	buffer[0] = 1;
+	SAVE_COLOR(buffer[1], background_color);
+	SAVE_COLOR(buffer[2], battery_color);
+	SAVE_COLOR(buffer[3], bluetooth_color);
+	SAVE_COLOR(buffer[4], hand_color);
+	SAVE_COLOR(buffer[5], hour_mark_color);
+	SAVE_COLOR(buffer[6], inner_rectangle_color);
+	SAVE_COLOR(buffer[7], minute_mark_color);
+	SAVE_COLOR(buffer[8], text_color);
+
+	buffer[9] = bluetooth_vibration ? 1 : 0;
+	buffer[10] = show_battery_icon_below;
+
+	memcpy(buffer + 11, text_format, sizeof text_format);
+
+	i = persist_write_data(1, buffer, sizeof buffer);
+
+	if (i < 0 || (size_t)i != sizeof buffer) {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "error while writing to persistent storage (%d)", i);
+	}
+}
 
 static GColor
 color_from_tuple(Tuple *tuple) {
@@ -466,6 +539,8 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 			    (unsigned long)tuple->key);
 		}
 	}
+
+	write_config();
 }
 
 static void
@@ -530,6 +605,7 @@ init(void) {
 
 	bluetooth_connected = connection_service_peek_pebble_app_connection();
 	current_battery = battery_state_service_peek().charge_percent;
+	read_config();
 
 	window = window_create();
 	window_set_window_handlers(window, (WindowHandlers) {
