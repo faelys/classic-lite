@@ -603,16 +603,6 @@ init(void) {
 	time_t current_time = time(0);
 	tm_now = *localtime(&current_time);
 
-	bluetooth_connected = connection_service_peek_pebble_app_connection();
-	current_battery = battery_state_service_peek().charge_percent;
-	read_config();
-
-	window = window_create();
-	window_set_window_handlers(window, (WindowHandlers) {
-		.load = window_load,
-		.unload = window_unload,
-	});
-
 	background_color = GColorWhite;
 	bluetooth_color = GColorBlack;
 	hand_color = GColorBlack;
@@ -627,6 +617,16 @@ init(void) {
 	battery_color = GColorDarkGray;
 	inner_rectangle_color = GColorLightGray;
 #endif
+
+	bluetooth_connected = connection_service_peek_pebble_app_connection();
+	current_battery = battery_state_service_peek().charge_percent;
+	read_config();
+
+	window = window_create();
+	window_set_window_handlers(window, (WindowHandlers) {
+		.load = window_load,
+		.unload = window_unload,
+	});
 
 	bluetooth_frame = gpath_create(&bluetooth_frame_points);
 	bluetooth_logo = gpath_create(&bluetooth_logo_points);
