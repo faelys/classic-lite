@@ -30,8 +30,6 @@
 
   function onSubmit() {
     // Set the return URL depending on the runtime environment
-    var formats = [ "", "Pebble", "%a %d", "%d %b", "%b %d", "%d %m", "%m %d",
-      "%a %d %m", "%a %m %d" ];
     var return_to = getQueryParam("return_to", "pebblejs://close#");
     var options = {
       "backgroundColor": document.getElementById("backgroundColorPicker").value,
@@ -44,7 +42,7 @@
       "lowBatteryLevel": document.getElementById("lowBatteryLevel").value,
       "bluetoothColor": document.getElementById("bluetoothColorPicker").value,
       "bluetoothVibration": document.getElementById("bluetoothVibration").checked ? "1" : "0",
-      "textFormat": encodeURIComponent(formats[document.getElementById("textFormat").value]),
+      "textFormat": encodeURIComponent(document.getElementById("textFormat").value),
     }
     document.location = return_to + encodeURIComponent(JSON.stringify(options));
   }
@@ -121,15 +119,15 @@
       <label class="item">
         Format
         <select id="textFormat" class="item-select">
-          <option class="item-select-option" value="0">(disabled)</option>
-          <option class="item-select-option" value="1">Pebble</option>
-          <option class="item-select-option" value="2" selected>Sun 31</option>
-          <option class="item-select-option" value="3">31 Jan</option>
-          <option class="item-select-option" value="4">Jan 31</option>
-          <option class="item-select-option" value="5">31 01</option>
-          <option class="item-select-option" value="6">01 31</option>
-          <option class="item-select-option" value="7">Sun 31 01</option>
-          <option class="item-select-option" value="8">Sun 01 31</option>
+          <option class="item-select-option" value="">(disabled)</option>
+          <option class="item-select-option" value="Pebble">Pebble</option>
+          <option class="item-select-option" value="%a %d" selected>Sun 31</option>
+          <option class="item-select-option" value="%d %b">31 Jan</option>
+          <option class="item-select-option" value="%b %d">Jan 31</option>
+          <option class="item-select-option" value="%d %m">31 01</option>
+          <option class="item-select-option" value="%m %d">01 31</option>
+          <option class="item-select-option" value="%a %d %m">Sun 31 01</option>
+          <option class="item-select-option" value="%a %m %d">Sun 01 31</option>
         </select>
       </label>
     </div>
