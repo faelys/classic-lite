@@ -83,7 +83,7 @@
     <div class="item-container-header">Low Battery Warning</div>
     <div class="item-container-content">
       <label class="item">
-        <input type="range" class="item-slider" name="lowBatteryLevel" value="50">
+        <input type="range" id="lowBatteryLevelSlider" class="item-slider" name="lowBatteryLevel" value="50">
         <div class="item-input-wrapper item-slider-text">
           <input type="text" id="lowBatteryLevel" class="item-input" name="lowBatteryLevel" value="50">
         </div>
@@ -140,5 +140,19 @@
   </div>
 
   <script src="https://cdn.rawgit.com/pebble/slate/v0.0.3/dist/js/slate.min.js"></script>
+  <script>
+    document.getElementById("backgroundColorPicker").value = getQueryParam("background", "0xFFFFFF");
+    document.getElementById("handColorPicker").value = getQueryParam("hands", "0x000000");
+    document.getElementById("hourColorPicker").value = getQueryParam("hours", "0x000000");
+    document.getElementById("innerColorPicker").value = getQueryParam("inner", "0xAAAAAA");
+    document.getElementById("minuteColorPicker").value = getQueryParam("minutes", "0x000000");
+    document.getElementById("lowBatteryLevelSlider").value =
+    document.getElementById("lowBatteryLevel").value = getQueryParam("battlvl", "50");
+    document.getElementById("batteryColorPicker").value = getQueryParam("battcol", "0x555555");
+    document.getElementById("bluetoothColorPicker").value = getQueryParam("bluetooth", "0x000000");
+    document.getElementById("bluetoothVibration").checked = (parseInt(getQueryParam("vibrate", "1")) > 0);
+    document.getElementById("textColorPicker").value = getQueryParam("textcol", "0x000000");
+    document.getElementById("textFormat").value = getQueryParam("textfmt", "Pebble");
+  </script>
 </body>
 </html>
