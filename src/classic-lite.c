@@ -198,10 +198,17 @@ color_from_tuple(Tuple *tuple) {
  * DISPLAY PRIMITIVES *
  **********************/
 
+#ifdef PBL_RECT
 static const GPathInfo minute_hand_path_points
 	= QUAD_PATH_POINTS(15, 6, -72, -6);
 static const GPathInfo hour_hand_path_points
 	= QUAD_PATH_POINTS(15, 7, -50, -7);
+#else
+static const GPathInfo minute_hand_path_points
+	= QUAD_PATH_POINTS(17, 7, -83, -7);
+static const GPathInfo hour_hand_path_points
+	= QUAD_PATH_POINTS(17, 8, -58, -8);
+#endif
 static const GPathInfo bluetooth_logo_points = { 7, (GPoint[]) {
 	{ -3, -3 },
 	{  3,  3 },
