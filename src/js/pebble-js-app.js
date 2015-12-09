@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2015, Natacha Porté
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 const settings = {  /* "name in local storage": "form input parameter" */
   "backgroundColor":     "background",
   "handColor":           "hands",
@@ -30,10 +46,7 @@ Pebble.addEventListener("ready", function() {
 });
 
 Pebble.addEventListener("showConfiguration", function() {
-/* TODO: switch to release version:
-  Pebble.openURL("https://cdn.rawgit.com/faelys/classic-lite/v1.0/config.html");
-*/
-  Pebble.openURL("https://rawgit.com/faelys/classic-lite/trunk/config.html" + encodeStored(settings));
+  Pebble.openURL("https://cdn.rawgit.com/faelys/classic-lite/v1.0/config.html" + encodeStored(settings));
 });
 
 Pebble.addEventListener("webviewclosed", function(e) {
