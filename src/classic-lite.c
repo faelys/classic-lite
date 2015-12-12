@@ -36,9 +36,11 @@ static uint8_t show_battery_icon_below = 100;
 #define PERSIST_BUFFER_SIZE 43
 
 #ifdef PBL_SDK_3
+#define IS_VISIBLE(color) ((color).argb != background_color.argb)
 #define READ_COLOR(color, byte) do { (color).argb = (byte); } while (0)
 #define SAVE_COLOR(byte, color) do { (byte) = (color).argb; } while (0)
 #elif PBL_SDK_2
+#define IS_VISIBLE(color) ((color) != background_color)
 #define READ_COLOR(color, byte) do { (color) = (byte); } while (0)
 #define SAVE_COLOR(byte, color) do { (byte) = (color); } while (0)
 #endif
@@ -237,6 +239,11 @@ static GPoint center;
 static char text_buffer[64];
 static uint8_t current_battery = 100;
 #define has_battery (current_battery > show_battery_icon_below)
+#define ICON_LAYER_SET_HIDDEN  do { \
+	layer_set_hidden(icon_layer, \
+	    (bluetooth_connected || !IS_VISIBLE(bluetooth_color)) \
+	    && (has_battery || !IS_VISIBLE(battery_color))); \
+	} while (0)
 
 #ifdef PBL_RECT
 static void
@@ -271,64 +278,75 @@ background_layer_draw(Layer *layer, GContext *ctx) {
 
 	(void)layer;
 
-	graphics_context_set_stroke_color(ctx, minute_mark_color);
-	INSET_RECT(rect, bounds, 5);
-	for (i = 0; i < 60; i += 1) {
-		point_at_angle(&rect, TRIG_MAX_ANGLE * i / 60, &pt1, &horiz);
-		pt2.x = pt1.x + horiz;
-		pt2.y = pt1.y + (1 - horiz);
-		graphics_draw_line(ctx, pt1, pt2);
+	if (IS_VISIBLE(minute_mark_color)) {
+		graphics_context_set_stroke_color(ctx, minute_mark_color);
+		INSET_RECT(rect, bounds, 5);
+		for (i = 0; i < 60; i += 1) {
+			point_at_angle(&rect, TRIG_MAX_ANGLE * i / 60,
+			    &pt1, &horiz);
+			pt2.x = pt1.x + horiz;
+			pt2.y = pt1.y + (1 - horiz);
+			graphics_draw_line(ctx, pt1, pt2);
+		}
 	}
 
+	if (IS_VISIBLE(hour_mark_color)) {
 #ifndef PBL_BW
-	graphics_context_set_stroke_width(ctx, 3);
+		graphics_context_set_stroke_width(ctx, 3);
 #endif
 
-	graphics_context_set_stroke_color(ctx, hour_mark_color);
-	INSET_RECT(rect,  bounds, 11);
-	INSET_RECT(rect2, bounds, 22);
-	for (i = 0; i < 12; i += 1) {
-		point_at_angle(&rect, TRIG_MAX_ANGLE * i / 12, &pt1, &horiz);
-		point_at_angle(&rect2, TRIG_MAX_ANGLE * i / 12, &pt2, &horiz);
+		graphics_context_set_stroke_color(ctx, hour_mark_color);
+		INSET_RECT(rect,  bounds, 11);
+		INSET_RECT(rect2, bounds, 22);
+		for (i = 0; i < 12; i += 1) {
+			point_at_angle(&rect, TRIG_MAX_ANGLE * i / 12,
+			    &pt1, &horiz);
+			point_at_angle(&rect2, TRIG_MAX_ANGLE * i / 12,
+			    &pt2, &horiz);
 
-		graphics_draw_line(ctx, pt1, pt2);
+			graphics_draw_line(ctx, pt1, pt2);
 
 #ifdef PBL_BW
-		pt1.x += horiz;        pt2.x += horiz;
-		pt1.y += 1 - horiz;    pt2.y += 1 - horiz;
-		graphics_draw_line(ctx, pt1, pt2);
+			pt1.x += horiz;        pt2.x += horiz;
+			pt1.y += 1 - horiz;    pt2.y += 1 - horiz;
+			graphics_draw_line(ctx, pt1, pt2);
 
-		pt1.x -= 2 * horiz;        pt2.x -= 2 * horiz;
-		pt1.y -= 2 * (1 - horiz);  pt2.y -= 2 * (1 - horiz);
-		graphics_draw_line(ctx, pt1, pt2);
+			pt1.x -= 2 * horiz;        pt2.x -= 2 * horiz;
+			pt1.y -= 2 * (1 - horiz);  pt2.y -= 2 * (1 - horiz);
+			graphics_draw_line(ctx, pt1, pt2);
 #endif
-	}
+		}
 
 #ifndef PBL_BW
-	graphics_context_set_stroke_width(ctx, 1);
+		graphics_context_set_stroke_width(ctx, 1);
 #endif
+	}
 
-	INSET_RECT(rect, bounds, 35);
-	graphics_context_set_stroke_color(ctx, inner_rectangle_color);
+	if (IS_VISIBLE(inner_rectangle_color)) {
+		INSET_RECT(rect, bounds, 35);
+		graphics_context_set_stroke_color(ctx, inner_rectangle_color);
 #ifdef PBL_BW
-	pt1.y = rect.origin.y;
-	pt2.y = rect.origin.y + rect.size.h - 1;
-	for (i = rect.origin.x +2; i < rect.origin.x + rect.size.w; i += 3) {
-		pt1.x = pt2.x = i;
-		graphics_draw_pixel(ctx, pt1);
-		graphics_draw_pixel(ctx, pt2);
-	}
+		pt1.y = rect.origin.y;
+		pt2.y = rect.origin.y + rect.size.h - 1;
+		for (i = rect.origin.x +2; i < rect.origin.x + rect.size.w; i += 3) {
+			pt1.x = pt2.x = i;
+			graphics_draw_pixel(ctx, pt1);
+			graphics_draw_pixel(ctx, pt2);
+		}
 
-	pt1.x = rect.origin.x;
-	pt2.x = rect.origin.x + rect.size.w - 1;
-	for (i = rect.origin.y +2; i < rect.origin.y + rect.size.h; i += 3) {
-		pt1.y = pt2.y = i;
-		graphics_draw_pixel(ctx, pt1);
-		graphics_draw_pixel(ctx, pt2);
-	}
+		pt1.x = rect.origin.x;
+		pt2.x = rect.origin.x + rect.size.w - 1;
+		for (i = rect.origin.y +2;
+		    i < rect.origin.y + rect.size.h;
+		    i += 3) {
+			pt1.y = pt2.y = i;
+			graphics_draw_pixel(ctx, pt1);
+			graphics_draw_pixel(ctx, pt2);
+		}
 #else
-	graphics_draw_rect(ctx, rect);
+		graphics_draw_rect(ctx, rect);
 #endif
+	}
 }
 #else
 static void
@@ -344,30 +362,36 @@ background_layer_draw(Layer *layer, GContext *ctx) {
 
 	(void)layer;
 
-	graphics_context_set_stroke_color(ctx, minute_mark_color);
-	INSET_RECT(rect, bounds, 5);
-	for (i = 0; i < 60; i += 1) {
-		angle = TRIG_MAX_ANGLE * i / 60;
-		graphics_draw_arc(ctx, rect, GOvalScaleModeFillCircle,
-		    angle - angle_delta, angle + angle_delta);
+	if (IS_VISIBLE(minute_mark_color)) {
+		graphics_context_set_stroke_color(ctx, minute_mark_color);
+		INSET_RECT(rect, bounds, 5);
+		for (i = 0; i < 60; i += 1) {
+			angle = TRIG_MAX_ANGLE * i / 60;
+			graphics_draw_arc(ctx, rect, GOvalScaleModeFillCircle,
+			    angle - angle_delta, angle + angle_delta);
+		}
 	}
 
-	graphics_context_set_stroke_width(ctx, 3);
-	graphics_context_set_stroke_color(ctx, hour_mark_color);
-	for (i = 0; i < 12; i += 1) {
-		angle = TRIG_MAX_ANGLE * i / 12;
-		x = sin_lookup(angle);
-		y = -cos_lookup(angle);
-		pt1.x = center.x + (radius - 11) * x / TRIG_MAX_RATIO;
-		pt1.y = center.y + (radius - 11) * y / TRIG_MAX_RATIO;
-		pt2.x = center.x + (radius - 22) * x / TRIG_MAX_RATIO;
-		pt2.y = center.y + (radius - 22) * y / TRIG_MAX_RATIO;
-		graphics_draw_line(ctx, pt1, pt2);
+	if (IS_VISIBLE(hour_mark_color)) {
+		graphics_context_set_stroke_width(ctx, 3);
+		graphics_context_set_stroke_color(ctx, hour_mark_color);
+		for (i = 0; i < 12; i += 1) {
+			angle = TRIG_MAX_ANGLE * i / 12;
+			x = sin_lookup(angle);
+			y = -cos_lookup(angle);
+			pt1.x = center.x + (radius - 11) * x / TRIG_MAX_RATIO;
+			pt1.y = center.y + (radius - 11) * y / TRIG_MAX_RATIO;
+			pt2.x = center.x + (radius - 22) * x / TRIG_MAX_RATIO;
+			pt2.y = center.y + (radius - 22) * y / TRIG_MAX_RATIO;
+			graphics_draw_line(ctx, pt1, pt2);
+		}
 	}
 
-	graphics_context_set_stroke_width(ctx, 1);
-	graphics_context_set_stroke_color(ctx, inner_rectangle_color);
-	graphics_draw_circle(ctx, center, radius - 35);
+	if (IS_VISIBLE(inner_rectangle_color)) {
+		graphics_context_set_stroke_width(ctx, 1);
+		graphics_context_set_stroke_color(ctx, inner_rectangle_color);
+		graphics_draw_circle(ctx, center, radius - 35);
+	}
 }
 #endif
 
@@ -399,7 +423,7 @@ icon_layer_draw(Layer *layer, GContext *ctx) {
 	GPoint center = grect_center_point(&bounds);
 	GPoint pt;
 
-	if (!bluetooth_connected) {
+	if (!bluetooth_connected && IS_VISIBLE(bluetooth_color)) {
 		pt.x = center.x;
 		pt.y = center.y + (has_battery ? +1 : -2);
 		gpath_move_to(bluetooth_frame, pt);
@@ -413,7 +437,7 @@ icon_layer_draw(Layer *layer, GContext *ctx) {
 #endif
 	}
 
-	if (!has_battery) {
+	if (!has_battery && IS_VISIBLE(battery_color)) {
 		pt.x = center.x - 11;
 		pt.y = center.y
 		    + (bluetooth_connected ? 0 : PBL_IF_RECT_ELSE(9, 11));
@@ -459,14 +483,14 @@ static void
 battery_handler(BatteryChargeState charge) {
 	if (current_battery == charge.charge_percent) return;
 	current_battery = charge.charge_percent;
-	layer_set_hidden(icon_layer, bluetooth_connected && has_battery);
+	ICON_LAYER_SET_HIDDEN;
 	if (!has_battery) layer_mark_dirty(icon_layer);
 }
 
 static void
 bluetooth_handler(bool connected) {
 	bluetooth_connected = connected;
-	layer_set_hidden(icon_layer, connected && has_battery);
+	ICON_LAYER_SET_HIDDEN;
 	layer_mark_dirty(icon_layer);
 
 	if (bluetooth_vibration && !connected) vibes_long_pulse();
@@ -549,8 +573,6 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 				APP_LOG(APP_LOG_LEVEL_ERROR, "bad type %d for "
 				    "show_battery_icon_below entry",
 				    (int)tuple->type);
-			layer_set_hidden(icon_layer,
-			    bluetooth_connected && has_battery);
 			break;
 		    default:
 			APP_LOG(APP_LOG_LEVEL_ERROR,
@@ -558,6 +580,16 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 			    (unsigned long)tuple->key);
 		}
 	}
+
+	layer_set_hidden(background_layer,
+	    !IS_VISIBLE(inner_rectangle_color)
+	    && !IS_VISIBLE(hour_mark_color)
+	    && !IS_VISIBLE(minute_mark_color));
+
+	ICON_LAYER_SET_HIDDEN;
+
+	layer_set_hidden(text_layer_get_layer(text_layer),
+	    !text_format[0] || !IS_VISIBLE(text_color));
 
 	write_config();
 }
@@ -585,6 +617,10 @@ window_load(Window *window) {
 
 	background_layer = layer_create(bounds);
 	layer_set_update_proc(background_layer, &background_layer_draw);
+	layer_set_hidden(background_layer,
+	    !IS_VISIBLE(inner_rectangle_color)
+	    && !IS_VISIBLE(hour_mark_color)
+	    && !IS_VISIBLE(minute_mark_color));
 	layer_add_child(window_layer, background_layer);
 
 	text_layer = text_layer_create(GRect(
@@ -595,13 +631,15 @@ window_load(Window *window) {
 	text_layer_set_background_color(text_layer, background_color);
 	text_layer_set_text_alignment(text_layer, GTextAlignmentCenter);
 	text_layer_set_font(text_layer, fonts_get_system_font(text_font));
+	layer_set_hidden(text_layer_get_layer(text_layer),
+	    !text_format[0] || !IS_VISIBLE(text_color));
 	layer_add_child(window_layer, text_layer_get_layer(text_layer));
 	update_text_layer(&tm_now);
 
 	icon_layer = layer_create(GRect(bounds.origin.x
 	    + (bounds.size.w - 33) / 2, PBL_IF_RECT_ELSE(97, 105), 33, 36));
 	layer_set_update_proc(icon_layer, &icon_layer_draw);
-	layer_set_hidden(icon_layer, bluetooth_connected && has_battery);
+	ICON_LAYER_SET_HIDDEN;
 	layer_add_child(window_layer, icon_layer);
 
 	hand_layer = layer_create(bounds);
