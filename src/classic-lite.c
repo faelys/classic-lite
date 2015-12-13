@@ -349,6 +349,20 @@ background_layer_draw(Layer *layer, GContext *ctx) {
 	}
 }
 #else
+static GPoint
+point_at_angle(GRect bounds, int32_t angle) {
+	GPoint ret;
+	uint32_t width = bounds.size.w;
+	uint32_t height = bounds.size.h;
+	ret.x = bounds.origin.x
+	    + (TRIG_MAX_RATIO * (width + 1) + width * sin_lookup(angle))
+	    / (2 * TRIG_MAX_RATIO);
+	ret.y = bounds.origin.y
+	    + (TRIG_MAX_RATIO * (height + 1) - height * cos_lookup(angle))
+	    / (2 * TRIG_MAX_RATIO);
+	return ret;
+}
+
 static void
 background_layer_draw(Layer *layer, GContext *ctx) {
 	const GRect bounds = layer_get_bounds(layer);
@@ -367,8 +381,9 @@ background_layer_draw(Layer *layer, GContext *ctx) {
 		INSET_RECT(rect, bounds, 5);
 		for (i = 0; i < 60; i += 1) {
 			angle = TRIG_MAX_ANGLE * i / 60;
-			graphics_draw_arc(ctx, rect, GOvalScaleModeFillCircle,
-			    angle - angle_delta, angle + angle_delta);
+			graphics_draw_line(ctx,
+			    point_at_angle(rect, angle - angle_delta),
+			    point_at_angle(rect, angle + angle_delta));
 		}
 	}
 
