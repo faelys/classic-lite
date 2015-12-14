@@ -17,6 +17,8 @@
 
 #include <pebble.h>
 
+#define CACHE_BACKGROUND
+
 /**********************
  * CONFIGURABLE STATE *
  **********************/
@@ -245,6 +247,88 @@ static uint8_t current_battery = 100;
 	    && (has_battery || !IS_VISIBLE(battery_color))); \
 	} while (0)
 
+#ifdef CACHE_BACKGROUND
+#define SCREEN_BUFFER_SIZE \
+    PBL_IF_RECT_ELSE(PBL_IF_COLOR_ELSE(144 * 168, 144 * 168 / 8), 25868)
+
+static uint8_t background_cache[SCREEN_BUFFER_SIZE];
+static bool use_background_cache = false;
+
+static size_t
+gbitmap_get_data_size(GBitmap *bitmap) {
+	GRect bounds;
+	if (!bitmap) return 0;
+
+	bounds = gbitmap_get_bounds(bitmap);
+#ifdef PBL_SDK_3
+	GBitmapDataRowInfo row_info;
+	switch (gbitmap_get_format(bitmap)) {
+	    case GBitmapFormat1Bit:
+		return bounds.size.w * bounds.size.h / 8;
+	    case GBitmapFormat8Bit:
+		return bounds.size.w * bounds.size.h;
+	    case GBitmapFormat8BitCircular:
+		row_info = gbitmap_get_data_row_info(bitmap, bounds.size.h - 1);
+		return (row_info.data + row_info.max_x + 1)
+		    - gbitmap_get_data(bitmap);
+	    default:
+		return 0;
+	}
+#else
+	return bounds.size.w * bounds.size.h / 8;
+#endif
+}
+
+static bool
+save_frame_buffer(GContext *ctx) {
+	GBitmap *frame_buffer = graphics_capture_frame_buffer(ctx);
+
+	if (!frame_buffer) {
+		APP_LOG(APP_LOG_LEVEL_WARNING,
+		    "Unable to capture frame buffer for saving");
+		return false;
+	}
+
+	if (gbitmap_get_data_size(frame_buffer) != SCREEN_BUFFER_SIZE) {
+		APP_LOG(APP_LOG_LEVEL_WARNING,
+		    "Unexpected frame buffer size %u, expected %u",
+		    gbitmap_get_data_size(frame_buffer), SCREEN_BUFFER_SIZE);
+		graphics_release_frame_buffer(ctx, frame_buffer);
+		return false;
+	}
+
+	memcpy(background_cache, gbitmap_get_data(frame_buffer),
+	    sizeof background_cache);
+	use_background_cache = true;
+	graphics_release_frame_buffer(ctx, frame_buffer);
+	return true;
+}
+
+static bool
+restore_frame_buffer(GContext *ctx) {
+	GBitmap *frame_buffer = graphics_capture_frame_buffer(ctx);
+
+	if (!frame_buffer) {
+		APP_LOG(APP_LOG_LEVEL_WARNING,
+		    "Unable to capture frame buffer for restore");
+		return false;
+	}
+
+	if (gbitmap_get_data_size(frame_buffer) != SCREEN_BUFFER_SIZE) {
+		APP_LOG(APP_LOG_LEVEL_WARNING,
+		    "Unexpected frame buffer size %u, expected %u",
+		    gbitmap_get_data_size(frame_buffer), SCREEN_BUFFER_SIZE);
+		graphics_release_frame_buffer(ctx, frame_buffer);
+		return false;
+	}
+
+	memcpy(gbitmap_get_data(frame_buffer), background_cache,
+	    sizeof background_cache);
+	graphics_release_frame_buffer(ctx, frame_buffer);
+	return true;
+}
+#endif
+
 #ifdef PBL_RECT
 static void
 point_at_angle(GRect *rect, int32_t angle, GPoint *output, int *horizontal) {
@@ -277,6 +361,10 @@ background_layer_draw(Layer *layer, GContext *ctx) {
 	GPoint pt1, pt2;
 
 	(void)layer;
+
+#ifdef CACHE_BACKGROUND
+	if (use_background_cache && restore_frame_buffer(ctx)) return;
+#endif
 
 	if (IS_VISIBLE(minute_mark_color)) {
 		graphics_context_set_stroke_color(ctx, minute_mark_color);
@@ -347,6 +435,10 @@ background_layer_draw(Layer *layer, GContext *ctx) {
 		graphics_draw_rect(ctx, rect);
 #endif
 	}
+
+#ifdef CACHE_BACKGROUND
+	save_frame_buffer(ctx);
+#endif
 }
 #else
 static GPoint
@@ -375,6 +467,10 @@ background_layer_draw(Layer *layer, GContext *ctx) {
 	int i;
 
 	(void)layer;
+
+#ifdef CACHE_BACKGROUND
+	if (use_background_cache && restore_frame_buffer(ctx)) return;
+#endif
 
 	if (IS_VISIBLE(minute_mark_color)) {
 		graphics_context_set_stroke_color(ctx, minute_mark_color);
@@ -407,6 +503,10 @@ background_layer_draw(Layer *layer, GContext *ctx) {
 		graphics_context_set_stroke_color(ctx, inner_rectangle_color);
 		graphics_draw_circle(ctx, center, radius - 35);
 	}
+
+#ifdef CACHE_BACKGROUND
+	save_frame_buffer(ctx);
+#endif
 }
 #endif
 
@@ -425,6 +525,10 @@ hand_layer_draw(Layer *layer, GContext *ctx) {
 	    TRIG_MAX_ANGLE * (tm_now.tm_hour * 60 + tm_now.tm_min) / 720);
 	gpath_draw_filled(ctx, hour_hand_path);
 	gpath_draw_outline(ctx, hour_hand_path);
+
+#ifdef CACHE_BACKGROUND
+	if (!use_background_cache) return;
+#endif
 
 	graphics_context_set_fill_color(ctx, background_color);
 	graphics_fill_circle(ctx, center, 2);
@@ -596,10 +700,17 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 		}
 	}
 
+#ifdef CACHE_BACKGROUND
+	use_background_cache = !IS_VISIBLE(inner_rectangle_color)
+	    && !IS_VISIBLE(hour_mark_color)
+	    && !IS_VISIBLE(minute_mark_color);
+	layer_set_hidden(background_layer, use_background_cache);
+#else
 	layer_set_hidden(background_layer,
 	    !IS_VISIBLE(inner_rectangle_color)
 	    && !IS_VISIBLE(hour_mark_color)
 	    && !IS_VISIBLE(minute_mark_color));
+#endif
 
 	ICON_LAYER_SET_HIDDEN;
 
@@ -632,10 +743,17 @@ window_load(Window *window) {
 
 	background_layer = layer_create(bounds);
 	layer_set_update_proc(background_layer, &background_layer_draw);
+#ifdef CACHE_BACKGROUND
+	use_background_cache = !IS_VISIBLE(inner_rectangle_color)
+	    && !IS_VISIBLE(hour_mark_color)
+	    && !IS_VISIBLE(minute_mark_color);
+	layer_set_hidden(background_layer, use_background_cache);
+#else
 	layer_set_hidden(background_layer,
 	    !IS_VISIBLE(inner_rectangle_color)
 	    && !IS_VISIBLE(hour_mark_color)
 	    && !IS_VISIBLE(minute_mark_color));
+#endif
 	layer_add_child(window_layer, background_layer);
 
 	text_layer = text_layer_create(GRect(
