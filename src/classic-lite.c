@@ -586,18 +586,6 @@ update_text_layer(struct tm *time) {
  * SERVICE HANDLERS *
  ********************/
 
-#ifdef PBL_ROUND
-static void
-app_did_focus(bool in_focus) {
-	if (in_focus) {
-		layer_mark_dirty(background_layer);
-		layer_mark_dirty(hand_layer);
-		layer_mark_dirty(icon_layer);
-		layer_mark_dirty(text_layer_get_layer(text_layer));
-	}
-}
-#endif
-
 static void
 battery_handler(BatteryChargeState charge) {
 	if (current_battery == charge.charge_percent) return;
@@ -778,18 +766,10 @@ window_load(Window *window) {
 	hand_layer = layer_create(bounds);
 	layer_set_update_proc(hand_layer, &hand_layer_draw);
 	layer_add_child(window_layer, hand_layer);
-
-#ifdef PBL_ROUND
-	app_focus_service_subscribe_handlers((AppFocusHandlers){
-	    .will_focus = 0,
-	    .did_focus = &app_did_focus,
-	});
-#endif
 }
 
 static void
 window_unload(Window *window) {
-	app_focus_service_unsubscribe();
 	layer_destroy(background_layer);
 	layer_destroy(hand_layer);
 	layer_destroy(icon_layer);
