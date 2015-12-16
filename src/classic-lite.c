@@ -819,7 +819,7 @@ init(void) {
 	window_stack_push(window, true);
 
 	app_message_register_inbox_received(inbox_received_handler);
-	app_message_open(app_message_inbox_size_maximum(), 0);
+	app_message_open(1024, 0);
 }
 
 static void
