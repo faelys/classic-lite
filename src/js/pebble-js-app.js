@@ -29,13 +29,11 @@ const settings = {  /* "name in local storage": "form input parameter" */
 };
 
 function encodeStored(names) {
-  var first = true;
-  var result = "";
+  var result = "?v=1.2";
   for (var key in names) {
     var value = localStorage.getItem(key);
     if (value != null) {
-      result = result + (first ? "?" : "&") + names[key] + "=" + encodeURIComponent(value);
-      first = false;
+      result = result + "&" + names[key] + "=" + encodeURIComponent(value);
     }
   }
   return result;

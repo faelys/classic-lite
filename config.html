@@ -153,6 +153,11 @@
     document.getElementById("bluetoothVibration").checked = (parseInt(getQueryParam("vibrate", "1")) > 0);
     document.getElementById("textColorPicker").value = getQueryParam("textcol", "0x000000");
     document.getElementById("textFormat").value = getQueryParam("textfmt", "Pebble");
+
+    const versionTag = getQueryParam("v");
+    if (versionTag) {
+      document.getElementsByTagName("h1")[0].childNodes[0].nodeValue = "Classic Lite " + versionTag;
+    }
   </script>
 </body>
 </html>
