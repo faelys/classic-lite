@@ -25,6 +25,7 @@
 
 static GColor background_color;
 static GColor battery_color;
+static GColor battery_color2;
 static GColor bluetooth_color;
 static GColor hand_color;
 static GColor hour_mark_color;
@@ -39,10 +40,12 @@ static uint8_t show_battery_icon_below = 100;
 
 #ifdef PBL_SDK_3
 #define IS_VISIBLE(color) ((color).argb != background_color.argb)
+#define IS_EQUAL(color1, color2) ((color1).argb == (color2).argb)
 #define READ_COLOR(color, byte) do { (color).argb = (byte); } while (0)
 #define SAVE_COLOR(byte, color) do { (byte) = (color).argb; } while (0)
 #elif PBL_SDK_2
 #define IS_VISIBLE(color) ((color) != background_color)
+#define IS_EQUAL(color1, color2) ((color1) == (color2))
 #define READ_COLOR(color, byte) do { (color) = (byte); } while (0)
 #define SAVE_COLOR(byte, color) do { (byte) = (color); } while (0)
 #endif
@@ -81,6 +84,8 @@ read_config(void) {
 	show_battery_icon_below = buffer[10];
 
 	memcpy(text_format, buffer + 11, sizeof text_format);
+
+	battery_color2 = battery_color;
 }
 
 static void
@@ -244,7 +249,8 @@ static uint8_t current_battery = 100;
 #define ICON_LAYER_SET_HIDDEN  do { \
 	layer_set_hidden(icon_layer, \
 	    (bluetooth_connected || !IS_VISIBLE(bluetooth_color)) \
-	    && (has_battery || !IS_VISIBLE(battery_color))); \
+	    && (has_battery \
+	     || !(IS_VISIBLE(battery_color) || IS_VISIBLE(battery_color2)))); \
 	} while (0)
 
 #ifdef CACHE_BACKGROUND
@@ -556,7 +562,8 @@ icon_layer_draw(Layer *layer, GContext *ctx) {
 #endif
 	}
 
-	if (!has_battery && IS_VISIBLE(battery_color)) {
+	if (!has_battery
+	    && (IS_VISIBLE(battery_color) || IS_VISIBLE(battery_color2))) {
 		pt.x = center.x - 11;
 		pt.y = center.y
 		    + (bluetooth_connected ? 0 : PBL_IF_RECT_ELSE(9, 11));
@@ -567,6 +574,15 @@ icon_layer_draw(Layer *layer, GContext *ctx) {
 		graphics_fill_rect(ctx,
 		    GRect(pt.x + 22, pt.y + 2, 2, 3),
 		    0, GCornerNone);
+		if (!IS_EQUAL(battery_color2, battery_color)) {
+			graphics_context_set_fill_color(ctx, battery_color2);
+			graphics_fill_rect(ctx,
+			    GRect(pt.x + 5, pt.y + 1, 4, 5),
+			    0, GCornerNone);
+			graphics_fill_rect(ctx,
+			    GRect(pt.x + 13, pt.y + 1, 4, 5),
+			    0, GCornerNone);
+		}
 		graphics_context_set_fill_color(ctx, background_color);
 		if (current_battery >= 5)
 			graphics_fill_rect(ctx,
@@ -647,7 +663,10 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 			text_color = color_from_tuple(tuple);
 			text_layer_set_text_color(text_layer, text_color);
 			break;
-		/*  case 9: is reserved for a future color */
+		    case 9:
+			battery_color2 = color_from_tuple(tuple);
+			layer_mark_dirty(icon_layer);
+			break;
 		/*  case 10: TODO: text_font */
 		    case 11:
 			if (tuple->type == TUPLE_CSTRING) {
@@ -795,6 +814,7 @@ init(void) {
 	battery_color = GColorDarkGray;
 	inner_rectangle_color = GColorLightGray;
 #endif
+	battery_color2 = battery_color;
 
 	bluetooth_connected = connection_service_peek_pebble_app_connection();
 	current_battery = battery_state_service_peek().charge_percent;
