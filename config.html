@@ -44,6 +44,7 @@
       "bluetoothColor": document.getElementById("bluetoothColorPicker").value,
       "bluetoothVibration": document.getElementById("bluetoothVibration").checked ? "1" : "0",
       "textFormat": encodeURIComponent(document.getElementById("textFormat").value),
+      "textFont": document.getElementById("textFont").value,
     }
     document.location = return_to + encodeURIComponent(JSON.stringify(options));
   }
@@ -135,6 +136,15 @@
           <option class="item-select-option" value="%a %m %d">Sun 01 31</option>
         </select>
       </label>
+      <label class="item">
+        Font Size
+        <select id="textFont" class="item-select">
+          <option class="item-select-option" value="1" selected>14</option>
+          <option class="item-select-option" value="2">18</option>
+          <option class="item-select-option" value="3">24</option>
+          <option class="item-select-option" value="4">28</option>
+        </select>
+      </label>
     </div>
   </div>
 
@@ -159,6 +169,7 @@
     document.getElementById("bluetoothVibration").checked = (parseInt(getQueryParam("vibrate", "1")) > 0);
     document.getElementById("textColorPicker").value = getQueryParam("textcol", "0x000000");
     document.getElementById("textFormat").value = getQueryParam("textfmt", "Pebble");
+    document.getElementById("textFont").value = getQueryParam("font", "1");
 
     const versionTag = getQueryParam("v");
     if (versionTag) {

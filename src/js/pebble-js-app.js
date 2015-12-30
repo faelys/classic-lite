@@ -27,6 +27,7 @@ const settings = {  /* "name in local storage": "form input parameter" */
   "bluetoothVibration":  "vibrate",
   "textColor":           "textcol",
   "textFormat":          "textfmt",
+  "textFont":            "font",
 };
 
 function encodeStored(names) {
@@ -65,6 +66,7 @@ Pebble.addEventListener("webviewclosed", function(e) {
     7: parseInt(configData["minuteColor"]),
     8: parseInt(configData["textColor"]),
     9: parseInt(configData["batteryColor2"]),
+    10: parseInt(configData["textFont"]),
     11: configData["textFormat"],
     12: parseInt(configData["bluetoothVibration"]),
     13: parseInt(configData["lowBatteryLevel"]),

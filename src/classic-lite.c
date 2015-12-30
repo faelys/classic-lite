@@ -32,11 +32,33 @@ static GColor hour_mark_color;
 static GColor inner_rectangle_color;
 static GColor minute_mark_color;
 static GColor text_color;
-static const char *text_font = FONT_KEY_GOTHIC_14;
+static unsigned text_font = 0;
 static char text_format[32] = "%a %d";
 static bool bluetooth_vibration = true;
 static uint8_t show_battery_icon_below = 100;
 #define PERSIST_BUFFER_SIZE 43
+#define TEXT_FONT_NUMBER 4
+
+static const char *const text_fonts[] = {
+	FONT_KEY_GOTHIC_14,
+	FONT_KEY_GOTHIC_18,
+	FONT_KEY_GOTHIC_24,
+	FONT_KEY_GOTHIC_28,
+};
+
+static const uint16_t text_offsets[] = {
+	36 + PBL_IF_RECT_ELSE(5, 15),
+	36 + PBL_IF_RECT_ELSE(2, 12),
+	36 + PBL_IF_RECT_ELSE(-1, 8),
+	36 + PBL_IF_RECT_ELSE(-2, 7),
+};
+
+static const uint16_t text_heights[] = {
+	17,
+	22,
+	29,
+	33,
+};
 
 #ifdef PBL_SDK_3
 #define IS_VISIBLE(color) ((color).argb != background_color.argb)
@@ -598,6 +620,36 @@ update_text_layer(struct tm *time) {
 	text_layer_set_text(text_layer, text_buffer);
 }
 
+static void
+update_text_font(unsigned new_text_font) {
+	Layer *window_layer = window_get_root_layer(window);
+	GRect bounds = layer_get_bounds(window_layer);
+
+	if (new_text_font >= TEXT_FONT_NUMBER) return;
+
+	if (text_layer) {
+		if (new_text_font == text_font) return;
+		text_layer_destroy(text_layer);
+	}
+
+	text_font = new_text_font;
+
+	text_layer = text_layer_create(GRect(
+	    bounds.origin.x,
+	    bounds.origin.y + text_offsets[text_font],
+	    bounds.size.w,
+	    text_heights[text_font]));
+	text_layer_set_text_color(text_layer, text_color);
+	text_layer_set_background_color(text_layer, GColorClear);
+	text_layer_set_text_alignment(text_layer, GTextAlignmentCenter);
+	text_layer_set_font(text_layer,
+	    fonts_get_system_font(text_fonts[text_font]));
+	layer_set_hidden(text_layer_get_layer(text_layer),
+	    !text_format[0] || !IS_VISIBLE(text_color));
+	layer_insert_below_sibling(text_layer_get_layer(text_layer),
+	    icon_layer);
+}
+
 /********************
  * SERVICE HANDLERS *
  ********************/
@@ -632,8 +684,6 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 		    case 1:
 			background_color = color_from_tuple(tuple);
 			window_set_background_color(window, background_color);
-			text_layer_set_background_color(text_layer,
-			    background_color);
 			break;
 		    case 2:
 			battery_color = color_from_tuple(tuple);
@@ -667,7 +717,21 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 			battery_color2 = color_from_tuple(tuple);
 			layer_mark_dirty(icon_layer);
 			break;
-		/*  case 10: TODO: text_font */
+		    case 10:
+			if (tuple->type != TUPLE_INT
+			    && tuple->type != TUPLE_UINT)
+				APP_LOG(APP_LOG_LEVEL_ERROR,
+				    "bad type %d for text_font entry",
+				    (int)tuple->type);
+			else if (tuple->value->uint8 == 0
+			    || tuple->value->uint8 > TEXT_FONT_NUMBER)
+				APP_LOG(APP_LOG_LEVEL_ERROR,
+				    "bad value %u for text_font entry",
+				    (unsigned)tuple->value->uint8);
+			else
+				update_text_font(tuple->value->uint8 - 1);
+				update_text_layer(&tm_now);
+			break;
 		    case 11:
 			if (tuple->type == TUPLE_CSTRING) {
 				strncpy(text_format, tuple->value->cstring,
@@ -763,24 +827,14 @@ window_load(Window *window) {
 #endif
 	layer_add_child(window_layer, background_layer);
 
-	text_layer = text_layer_create(GRect(
-	    bounds.origin.x + (bounds.size.w - 72) / 2,
-	    bounds.origin.y + 36 + PBL_IF_RECT_ELSE(5, 15),
-	    72, 23));
-	text_layer_set_text_color(text_layer, text_color);
-	text_layer_set_background_color(text_layer, background_color);
-	text_layer_set_text_alignment(text_layer, GTextAlignmentCenter);
-	text_layer_set_font(text_layer, fonts_get_system_font(text_font));
-	layer_set_hidden(text_layer_get_layer(text_layer),
-	    !text_format[0] || !IS_VISIBLE(text_color));
-	layer_add_child(window_layer, text_layer_get_layer(text_layer));
-	update_text_layer(&tm_now);
-
 	icon_layer = layer_create(GRect(bounds.origin.x
 	    + (bounds.size.w - 33) / 2, PBL_IF_RECT_ELSE(97, 105), 33, 36));
 	layer_set_update_proc(icon_layer, &icon_layer_draw);
 	ICON_LAYER_SET_HIDDEN;
 	layer_add_child(window_layer, icon_layer);
+
+	update_text_font(text_font);
+	update_text_layer(&tm_now);
 
 	hand_layer = layer_create(bounds);
 	layer_set_update_proc(hand_layer, &hand_layer_draw);
