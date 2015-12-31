@@ -36,7 +36,7 @@ static unsigned text_font = 0;
 static char text_format[32] = "%a %d";
 static bool bluetooth_vibration = true;
 static uint8_t show_battery_icon_below = 100;
-#define PERSIST_BUFFER_SIZE 43
+#define PERSIST_BUFFER_SIZE 45
 #define TEXT_FONT_NUMBER 4
 
 static const char *const text_fonts[] = {
@@ -81,15 +81,29 @@ read_config(void) {
 
 	if (i == E_DOES_NOT_EXIST) return;
 
-	if (i != PERSIST_BUFFER_SIZE) {
+	if (i < 1) {
 		APP_LOG(APP_LOG_LEVEL_ERROR,
-		    "unexpected persist buffer size %d", i);
+		    "invalid persist buffer size %d", i);
 		return;
 	}
 
-	if (buffer[0] != 1) {
+	if (buffer[0] < 1) {
 		APP_LOG(APP_LOG_LEVEL_ERROR,
-		    "unknown configuration version %u", (unsigned)(buffer[0]));
+		    "invalid configuration version %u", (unsigned)(buffer[0]));
+		return;
+	}
+
+	if (buffer[0] > 2) {
+		APP_LOG(APP_LOG_LEVEL_WARNING,
+		    "loading data from future version %u, "
+		    "data will be lost on the next write",
+		    (unsigned)(buffer[0]));
+		return;
+	}
+
+	if (i < 43) {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "truncated persistent buffer size at %d, aborting", i);
 		return;
 	}
 
@@ -108,6 +122,18 @@ read_config(void) {
 	memcpy(text_format, buffer + 11, sizeof text_format);
 
 	battery_color2 = battery_color;
+
+	if (buffer[0] < 2) return;
+
+	if (i < 45) {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "truncated persistent buffer (size %d), using only v1",
+		    i);
+		return;
+	}
+
+	READ_COLOR(battery_color2, buffer[43]);
+	text_font = buffer[44];
 }
 
 static void
@@ -115,7 +141,7 @@ write_config(void) {
 	uint8_t buffer[PERSIST_BUFFER_SIZE];
 	int i;
 
-	buffer[0] = 1;
+	buffer[0] = 2;
 	SAVE_COLOR(buffer[1], background_color);
 	SAVE_COLOR(buffer[2], battery_color);
 	SAVE_COLOR(buffer[3], bluetooth_color);
@@ -129,6 +155,9 @@ write_config(void) {
 	buffer[10] = show_battery_icon_below;
 
 	memcpy(buffer + 11, text_format, sizeof text_format);
+
+	SAVE_COLOR(buffer[43], battery_color2);
+	buffer[44] = text_font;
 
 	i = persist_write_data(1, buffer, sizeof buffer);
 
