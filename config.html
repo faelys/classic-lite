@@ -31,6 +31,7 @@
   function onSubmit() {
     // Set the return URL depending on the runtime environment
     var return_to = getQueryParam("return_to", "pebblejs://close#");
+    var selectedFormat = document.getElementById("textFormat").value;
     var options = {
       "backgroundColor": document.getElementById("backgroundColorPicker").value,
       "handColor": document.getElementById("handColorPicker").value,
@@ -43,14 +44,20 @@
       "lowBatteryLevel": document.getElementById("lowBatteryLevel").value,
       "bluetoothColor": document.getElementById("bluetoothColorPicker").value,
       "bluetoothVibration": document.getElementById("bluetoothVibration").checked ? "1" : "0",
-      "textFormat": encodeURIComponent(document.getElementById("textFormat").value),
+      "textFormat": encodeURIComponent(selectedFormat === "%" ? document.getElementById("customFormat").value : selectedFormat),
       "textFont": document.getElementById("textFont").value,
     }
     document.location = return_to + encodeURIComponent(JSON.stringify(options));
   }
+
+  function setCustomFormatVisibility() {
+    document.getElementById("customFormatElement").style.display
+     = (document.getElementById("textFormat").value === "%")
+     ? "block" : "none";
+  }
   </script>
 </head>
-<body>
+<body onload="setCustomFormatVisibility()">
   <div class="item-container">
     <h1 class="title">Classic Lite</h1>
   </div>
@@ -124,7 +131,7 @@
       </label>
       <label class="item">
         Format
-        <select id="textFormat" class="item-select">
+        <select id="textFormat" class="item-select" onchange="setCustomFormatVisibility()">
           <option class="item-select-option" value="">(disabled)</option>
           <option class="item-select-option" value="Pebble">Pebble</option>
           <option class="item-select-option" value="%a %d" selected>Sun 31</option>
@@ -134,7 +141,13 @@
           <option class="item-select-option" value="%m %d">01 31</option>
           <option class="item-select-option" value="%a %d %m">Sun 31 01</option>
           <option class="item-select-option" value="%a %m %d">Sun 01 31</option>
+          <option class="item-select-option" value="%">(Custom)</option>
         </select>
+      </label>
+      <label class="item" id="customFormatElement">
+        <div class="item-input-wrapper">
+           <input type="text" class="item-input" name="customFormat" id="customFormat" placeholder="Custom Format">
+        </div>
       </label>
       <label class="item">
         Font Size
@@ -168,8 +181,15 @@
     document.getElementById("bluetoothColorPicker").value = getQueryParam("bluetooth", "0x000000");
     document.getElementById("bluetoothVibration").checked = (parseInt(getQueryParam("vibrate", "1")) > 0);
     document.getElementById("textColorPicker").value = getQueryParam("textcol", "0x000000");
-    document.getElementById("textFormat").value = getQueryParam("textfmt", "Pebble");
     document.getElementById("textFont").value = getQueryParam("font", "1");
+
+    const textFmt = getQueryParam("textfmt", "Pebble");
+    var selectElement =  document.getElementById("textFormat");
+    selectElement.value = textFmt;
+    if (selectElement.value !== textFmt) {
+      selectElement.value = "%";
+      document.getElementById("customFormat").value = textFmt;
+    }
 
     const versionTag = getQueryParam("v");
     if (versionTag) {
