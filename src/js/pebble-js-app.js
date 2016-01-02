@@ -31,7 +31,7 @@ const settings = {  /* "name in local storage": "form input parameter" */
 };
 
 function encodeStored(names) {
-  var result = "?v=1.2";
+  var result = "?v=1.3";
   for (var key in names) {
     var value = localStorage.getItem(key);
     if (value != null) {
@@ -46,7 +46,7 @@ Pebble.addEventListener("ready", function() {
 });
 
 Pebble.addEventListener("showConfiguration", function() {
-  Pebble.openURL("https://cdn.rawgit.com/faelys/classic-lite/v1.0/config.html" + encodeStored(settings));
+  Pebble.openURL("https://cdn.rawgit.com/faelys/classic-lite/v1.3/config.html" + encodeStored(settings));
 });
 
 Pebble.addEventListener("webviewclosed", function(e) {

@@ -3,7 +3,7 @@
   "shortName": "Classic Lite",
   "longName": "Classic Lite",
   "companyName": "Natasha Kerensikova",
-  "versionLabel": "1.2",
+  "versionLabel": "1.3",
   "sdkVersion": "3",
   "targetPlatforms": ["aplite", "basalt", "chalk"],
   "capabilities": [ "configurable" ],
