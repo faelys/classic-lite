@@ -34,7 +34,9 @@
     var selectedFormat = document.getElementById("textFormat").value;
     var options = {
       "backgroundColor": document.getElementById("backgroundColorPicker").value,
-      "handColor": document.getElementById("handColorPicker").value,
+      "hourHandColor": document.getElementById("hourHandColorPicker").value,
+      "minuteHandColor": document.getElementById("minuteHandColorPicker").value,
+      "pinColor": document.getElementById("pinColorPicker").value,
       "hourColor": document.getElementById("hourColorPicker").value,
       "innerColor": document.getElementById("innerColorPicker").value,
       "minuteColor": document.getElementById("minuteColorPicker").value,
@@ -70,8 +72,16 @@
         <input id="backgroundColorPicker" type="text" class="item-color item-color-normal" value="0xFFFFFF">
       </label>
       <label class="item">
-        Hand Color
-        <input id="handColorPicker" type="text" class="item-color item-color-normal" value="0x000000">
+        Hour Hand Color
+        <input id="hourHandColorPicker" type="text" class="item-color item-color-normal" value="0x000000">
+      </label>
+      <label class="item">
+        Minute Hand Color
+        <input id="minuteHandColorPicker" type="text" class="item-color item-color-normal" value="0x000000">
+      </label>
+      <label class="item">
+        Central Pin Color
+        <input id="pinColorPicker" type="text" class="item-color item-color-normal" value="0x000000">
       </label>
       <label class="item">
         Hour Mark Color
@@ -169,8 +179,11 @@
 
   <script src="https://cdn.rawgit.com/pebble/slate/v0.0.3/dist/js/slate.min.js"></script>
   <script>
+    var handColor = getQueryParam("hands", "0x000000");
     document.getElementById("backgroundColorPicker").value = getQueryParam("background", "0xFFFFFF");
-    document.getElementById("handColorPicker").value = getQueryParam("hands", "0x000000");
+    document.getElementById("hourHandColorPicker").value = getQueryParam("hhand", handColor);
+    document.getElementById("minuteHandColorPicker").value = getQueryParam("mhand", handColor);
+    document.getElementById("pinColorPicker").value = getQueryParam("pin", handColor);
     document.getElementById("hourColorPicker").value = getQueryParam("hours", "0x000000");
     document.getElementById("innerColorPicker").value = getQueryParam("inner", "0xAAAAAA");
     document.getElementById("minuteColorPicker").value = getQueryParam("minutes", "0x000000");

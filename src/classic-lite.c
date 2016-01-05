@@ -27,7 +27,9 @@ static GColor background_color;
 static GColor battery_color;
 static GColor battery_color2;
 static GColor bluetooth_color;
-static GColor hand_color;
+static GColor hour_hand_color;
+static GColor minute_hand_color;
+static GColor pin_color;
 static GColor hour_mark_color;
 static GColor inner_rectangle_color;
 static GColor minute_mark_color;
@@ -36,7 +38,7 @@ static unsigned text_font = 0;
 static char text_format[32] = "%a %d";
 static bool bluetooth_vibration = true;
 static uint8_t show_battery_icon_below = 100;
-#define PERSIST_BUFFER_SIZE 45
+#define PERSIST_BUFFER_SIZE 47
 #define TEXT_FONT_NUMBER 4
 
 static const char *const text_fonts[] = {
@@ -93,7 +95,7 @@ read_config(void) {
 		return;
 	}
 
-	if (buffer[0] > 2) {
+	if (buffer[0] > 3) {
 		APP_LOG(APP_LOG_LEVEL_WARNING,
 		    "loading data from future version %u, "
 		    "data will be lost on the next write",
@@ -110,7 +112,7 @@ read_config(void) {
 	READ_COLOR(background_color,      buffer[1]);
 	READ_COLOR(battery_color,         buffer[2]);
 	READ_COLOR(bluetooth_color,       buffer[3]);
-	READ_COLOR(hand_color,            buffer[4]);
+	READ_COLOR(hour_hand_color,       buffer[4]);
 	READ_COLOR(hour_mark_color,       buffer[5]);
 	READ_COLOR(inner_rectangle_color, buffer[6]);
 	READ_COLOR(minute_mark_color,     buffer[7]);
@@ -122,6 +124,7 @@ read_config(void) {
 	memcpy(text_format, buffer + 11, sizeof text_format);
 
 	battery_color2 = battery_color;
+	pin_color = minute_hand_color = hour_hand_color;
 
 	if (buffer[0] < 2) return;
 
@@ -134,6 +137,18 @@ read_config(void) {
 
 	READ_COLOR(battery_color2, buffer[43]);
 	text_font = buffer[44];
+
+	if (buffer[0] < 3) return;
+
+	if (i < 47) {
+		APP_LOG(APP_LOG_LEVEL_ERROR,
+		    "truncated persistent buffer (size %d), using only v2",
+		    i);
+		return;
+	}
+
+	READ_COLOR(minute_hand_color, buffer[45]);
+	READ_COLOR(pin_color, buffer[46]);
 }
 
 static void
@@ -141,11 +156,13 @@ write_config(void) {
 	uint8_t buffer[PERSIST_BUFFER_SIZE];
 	int i;
 
-	buffer[0] = 2;
+	buffer[0] = 3;
 	SAVE_COLOR(buffer[1], background_color);
 	SAVE_COLOR(buffer[2], battery_color);
 	SAVE_COLOR(buffer[3], bluetooth_color);
-	SAVE_COLOR(buffer[4], hand_color);
+	SAVE_COLOR(buffer[4], hour_hand_color);
+	SAVE_COLOR(buffer[45], minute_hand_color);
+	SAVE_COLOR(buffer[46], pin_color);
 	SAVE_COLOR(buffer[5], hour_mark_color);
 	SAVE_COLOR(buffer[6], inner_rectangle_color);
 	SAVE_COLOR(buffer[7], minute_mark_color);
@@ -571,12 +588,14 @@ static void
 hand_layer_draw(Layer *layer, GContext *ctx) {
 	(void)layer;
 
-	graphics_context_set_fill_color(ctx, hand_color);
+	graphics_context_set_fill_color(ctx, hour_hand_color);
 	graphics_context_set_stroke_color(ctx, background_color);
 
 	gpath_rotate_to(minute_hand_path, TRIG_MAX_ANGLE * tm_now.tm_min / 60);
 	gpath_draw_filled(ctx, minute_hand_path);
 	gpath_draw_outline(ctx, minute_hand_path);
+
+	graphics_context_set_fill_color(ctx, minute_hand_color);
 
 	gpath_rotate_to(hour_hand_path,
 	    TRIG_MAX_ANGLE * (tm_now.tm_hour * 60 + tm_now.tm_min) / 720);
@@ -589,7 +608,7 @@ hand_layer_draw(Layer *layer, GContext *ctx) {
 
 	graphics_context_set_fill_color(ctx, background_color);
 	graphics_fill_circle(ctx, center, 2);
-	graphics_context_set_fill_color(ctx, hand_color);
+	graphics_context_set_fill_color(ctx, pin_color);
 	graphics_fill_circle(ctx, center, 1);
 }
 
@@ -723,7 +742,8 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 			layer_mark_dirty(icon_layer);
 			break;
 		    case 4:
-			hand_color = color_from_tuple(tuple);
+			hour_hand_color = color_from_tuple(tuple);
+			pin_color = minute_hand_color = hour_hand_color;
 			layer_mark_dirty(hand_layer);
 			break;
 		    case 5:
@@ -792,6 +812,18 @@ inbox_received_handler(DictionaryIterator *iterator, void *context) {
 				APP_LOG(APP_LOG_LEVEL_ERROR, "bad type %d for "
 				    "show_battery_icon_below entry",
 				    (int)tuple->type);
+			break;
+		    case 20:
+			hour_hand_color = color_from_tuple(tuple);
+			layer_mark_dirty(hand_layer);
+			break;
+		    case 21:
+			minute_hand_color = color_from_tuple(tuple);
+			layer_mark_dirty(hand_layer);
+			break;
+		    case 22:
+			pin_color = color_from_tuple(tuple);
+			layer_mark_dirty(hand_layer);
 			break;
 		    default:
 			APP_LOG(APP_LOG_LEVEL_ERROR,
@@ -885,7 +917,9 @@ init(void) {
 
 	background_color = GColorWhite;
 	bluetooth_color = GColorBlack;
-	hand_color = GColorBlack;
+	hour_hand_color = GColorBlack;
+	minute_hand_color = GColorBlack;
+	pin_color = GColorBlack;
 	hour_mark_color = GColorBlack;
 	minute_mark_color = GColorBlack;
 	text_color = GColorBlack;

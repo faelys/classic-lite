@@ -16,7 +16,9 @@
 
 const settings = {  /* "name in local storage": "form input parameter" */
   "backgroundColor":     "background",
-  "handColor":           "hands",
+  "hourHandColor":       "hhand",
+  "minuteHandColor":     "mhand",
+  "pinColor":            "pin",
   "hourColor":           "hours",
   "innerColor":          "inner",
   "minuteColor":         "minutes",
@@ -31,6 +33,20 @@ const settings = {  /* "name in local storage": "form input parameter" */
 };
 
 function encodeStored(names) {
+  var handColorValue = localStorage.getItem("handColor");
+  if (handColorValue != null) {
+    if (localStorage.getItem("hourHandColor") == null) {
+      localStorage.setItem("hourHandColor", handColorValue);
+    }
+    if (localStorage.getItem("minuteHandColor") == null) {
+      localStorage.setItem("minuteHandColor", handColorValue);
+    }
+    if (localStorage.getItem("pinColor") == null) {
+      localStorage.setItem("pinColor", handColorValue);
+    }
+    localStorage.removeItem("handColor");
+  }
+
   var result = "?v=1.3";
   for (var key in names) {
     var value = localStorage.getItem(key);
@@ -60,7 +76,6 @@ Pebble.addEventListener("webviewclosed", function(e) {
     1: parseInt(configData["backgroundColor"]),
     2: parseInt(configData["batteryColor"]),
     3: parseInt(configData["bluetoothColor"]),
-    4: parseInt(configData["handColor"]),
     5: parseInt(configData["hourColor"]),
     6: parseInt(configData["innerColor"]),
     7: parseInt(configData["minuteColor"]),
@@ -70,6 +85,9 @@ Pebble.addEventListener("webviewclosed", function(e) {
     11: configData["textFormat"],
     12: parseInt(configData["bluetoothVibration"]),
     13: parseInt(configData["lowBatteryLevel"]),
+    20: parseInt(configData["hourHandColor"]),
+    21: parseInt(configData["minuteHandColor"]),
+    22: parseInt(configData["pinColor"]),
   };
 
   Pebble.sendAppMessage(dict, function() {
