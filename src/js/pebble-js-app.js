@@ -47,7 +47,7 @@ function encodeStored(names) {
     localStorage.removeItem("handColor");
   }
 
-  var result = "?v=1.3";
+  var result = "?v=1.4";
   for (var key in names) {
     var value = localStorage.getItem(key);
     if (value != null) {
@@ -62,7 +62,7 @@ Pebble.addEventListener("ready", function() {
 });
 
 Pebble.addEventListener("showConfiguration", function() {
-  Pebble.openURL("https://cdn.rawgit.com/faelys/classic-lite/v1.3/config.html" + encodeStored(settings));
+  Pebble.openURL("https://cdn.rawgit.com/faelys/classic-lite/v1.4/config.html" + encodeStored(settings));
 });
 
 Pebble.addEventListener("webviewclosed", function(e) {
