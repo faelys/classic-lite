@@ -654,7 +654,7 @@ icon_layer_draw(Layer *layer, GContext *ctx) {
 			    0, GCornerNone);
 		}
 		graphics_context_set_fill_color(ctx, background_color);
-		if (current_battery >= 5)
+		if (current_battery < 100)
 			graphics_fill_rect(ctx,
 			    GRect(pt.x + 1 + current_battery / 5, pt.y + 1,
 			    20 - current_battery / 5, 5),
