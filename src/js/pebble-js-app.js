@@ -47,7 +47,7 @@ function encodeStored(names) {
     localStorage.removeItem("handColor");
   }
 
-  var result = "?v=1.4";
+  var result = "?v=1.5";
   for (var key in names) {
     var value = localStorage.getItem(key);
     if (value != null) {
